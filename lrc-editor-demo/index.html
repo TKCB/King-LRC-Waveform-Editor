@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>King LRC Waveform Editor - LRC波形编辑器</title>
+<link rel="icon" type="image/png" href="images/logo.png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: #eef4f1; color: #1f2937;
+    display: flex; flex-direction: column; overflow: hidden;
+    user-select: none;
+  }
+
+  /* ============ 顶栏 ============ */
+  header {
+    background: #fff; border-bottom: 1px solid #e3ebe6;
+    padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04); z-index: 20;
+  }
+  header .hdr-br { flex-basis: 100%; width: 0; height: 0; overflow: hidden; }
+  header h1 { font-size: 16px; font-weight: 600; color: #0d9b6a; margin-right: 6px; white-space: nowrap; display: flex; align-items: center; }
+  header h1 .zh { font-size: 12px; font-weight: 400; color: #6f9b8c; margin-left: 8px; letter-spacing: .5px; }
+  header h1 .logo { height: 22px; width: auto; margin-right: 8px; display: block; }
+  .btn {
+    border: 1px solid #d2e2da; background: #fff; color: #334155;
+    border-radius: 7px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+    transition: all .15s; white-space: nowrap;
+  }
+  .btn:hover { border-color: #0d9b6a; color: #0b8a63; background: #e9f8f1; }
+  .btn.primary { background: #0d9b6a; border-color: #0d9b6a; color: #fff; }
+  .btn.primary:hover { background: #0a7f5c; }
+  .btn.icon { padding: 6px 10px; display: inline-flex; align-items: center; justify-content: center; }
+  .btn.icon .ic { width: 15px; height: 15px; fill: currentColor; display: block; }
+  .btn.icon .ic-pause { display: none; }          /* 默认显示播放图标 */
+  #btnPlay.playing .ic-play { display: none; }
+  #btnPlay.playing .ic-pause { display: block; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .sep { width: 1px; height: 22px; background: #dfe8e3; margin: 0 2px; }
+  .toolbar-group { display: flex; align-items: center; gap: 6px; }
+  .toolbar-group.grow { flex: 1 1 auto; min-width: 0; }
+  .group-tag { font-size: 12px; color: #94a3b8; }
+  .time { flex: none; font-variant-numeric: tabular-nums; font-size: 13px; color: #475569; min-width: 64px; text-align: left; white-space: nowrap; }
+  #timeCur { text-align: left; margin-left: 6px; }
+  #timeTotal { margin-left: 6px; }
+  #seekBar { flex: 0 1 280px; min-width: 60px; accent-color: #0d9b6a; cursor: pointer; margin-left: -6px; }
+  #seekBar:disabled { opacity: .35; cursor: not-allowed; }
+  #fileInfo { font-size: 12px; color: #94a3b8; max-width: 440px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: auto; }
+  select.btn { padding: 6px 8px; }
+  label.chk { font-size: 13px; color: #5d786c; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  label.chk input[type="checkbox"] { accent-color: #0d9b6a; width: 14px; height: 14px; cursor: pointer; }
+  .seg { display: flex; border: 1px solid #d2e2da; border-radius: 7px; overflow: hidden; background: #fff; }
+  .seg button {
+    border: none; background: transparent; color: #64748b;
+    padding: 5px 10px; font-size: 12px; cursor: pointer; transition: all .15s;
+  }
+  .seg button + button { border-left: 1px solid #d2e2da; }
+  .seg button:hover { background: #e9f8f1; color: #0b8a63; }
+  .seg button.on { background: #0d9b6a; color: #fff; }
+  .seg button.on:hover { background: #0a7f5c; color: #fff; }
+
+  /* ============ 纯歌词编辑模式（整篇文本自由编辑） ============ */
+  #lyricPanel {
+    position: absolute; inset: 0; display: none; flex-direction: column; gap: 10px;
+    z-index: 5; background: #f2f8f5; padding: 14px 18px 12px; box-sizing: border-box;
+  }
+  #lyricPanel.open { display: flex; }
+  #lyricPanel .lp-bar {
+    flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    font-size: 12.5px; color: #5d786c;
+  }
+  #lyricPanel .lp-bar b { color: #0b8a63; }
+  #lyricPanel .lp-bar .dirty-tag {
+    color: #b45309; background: #fef3c7; border: 1px solid #fde68a;
+    padding: 1px 9px; border-radius: 999px; font-weight: 600;
+  }
+  #lyricEditor {
+    flex: 1; min-height: 0; width: 100%; resize: none; box-sizing: border-box;
+    border: 1px solid #d2e2da; border-radius: 10px; background: #fff;
+    padding: 12px 14px; outline: none; color: #243b31;
+    font: 13.5px/1.9 "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+    caret-color: #0d9b6a;
+  }
+  #lyricEditor:focus { border-color: #0d9b6a; box-shadow: 0 0 0 2.5px rgba(13,155,106,.14); }
+  #lyricEditor::placeholder { color: #9fb5a9; }
+  #lyricPanel .lp-actions {
+    flex: none; display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap;
+  }
+  #lyricPanel .lp-actions .hint { font-size: 12px; color: #6f8b7d; line-height: 1.7; }
+  #lyricPanel .lp-actions .hint code {
+    background: #e4f1ea; color: #0b7f5f; padding: 0 5px; border-radius: 4px;
+    font: 12px Consolas, monospace;
+  }
+  #lyricPanel .lp-actions .btns { flex: none; display: flex; gap: 8px; }
+
+  /* ============ 主区域 ============ */
+  main { flex: 1; position: relative; overflow: hidden; }
+
+  /* ============ 底栏 ============ */
+  footer {
+    flex: none; background: #fff; border-top: 1px solid #e3ebe6;
+    padding: 7px 16px; display: flex; align-items: center;
+    justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    font-size: 12px; color: #7b8aa5; z-index: 20;
+  }
+  footer .ver {
+    font-weight: 600; color: #0d9b6a; white-space: nowrap;
+    font-variant-numeric: tabular-nums; letter-spacing: .4px;
+  }
+  footer .slogan { text-align: right; line-height: 1.7; }
+  footer a { color: #0d9b6a; text-decoration: none; font-weight: 500; }
+  footer a:hover { text-decoration: underline; color: #0a7f5c; }
+
+  /* 空状态：拖放虚线框 + 下方操作提示 */
+  #dropHint {
+    position: absolute; inset: 24px; overflow-y: auto;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 22px; padding: 18px 10px 26px;
+  }
+  #dhCard {
+    flex: none; width: min(860px, 100%);
+    border: 2.5px dashed #b7d6c7; border-radius: 18px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 30px 26px; text-align: center; transition: all .2s;
+    background: #f9fcfb;
+  }
+  #dropHint.drag #dhCard { border-color: #0d9b6a; background: #e6f7ef; }
+  #dropHint .big { font-size: 40px; line-height: 1; }
+  #dropHint .big img { width: 84px; height: 84px; object-fit: contain; box-shadow: 0 6px 18px rgba(13,155,106,.18); }
+  #dropHint h2 { font-size: 18px; color: #334155; font-weight: 600; }
+  #dropHint p { font-size: 13px; color: #7b8aa5; line-height: 2; }
+  #dropHint .btns { display: flex; gap: 10px; margin-top: 6px; }
+  #dropHint b { color: #475569; }
+
+  /* 虚线框下方的操作提示卡 */
+  #helpPanel {
+    flex: none; width: min(860px, 100%);
+    background: #fff; border: 1px solid #e3ebe6; border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(30,41,90,.05);
+    padding: 16px 22px 14px; text-align: left;
+  }
+  #helpPanel .hp-cols {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 10px 30px;
+  }
+  #helpPanel .hp-group h4 {
+    font-size: 13px; font-weight: 700; color: #0d9b6a;
+    margin: 2px 0 5px; letter-spacing: .3px;
+  }
+  #helpPanel ol { list-style: none; margin: 0; padding: 0; font-size: 12.5px; color: #475569; line-height: 2.05; }
+  #helpPanel li em { font-style: normal; color: #0b5e43; font-weight: 600; }
+  #helpPanel kbd {
+    display: inline-block; padding: 0 7px; margin: 0 2px;
+    background: #eef4f1; border: 1px solid #cfe0d7; border-bottom-width: 2px; border-radius: 5px;
+    font-family: inherit; font-size: 12px; color: #0b5e43; line-height: 1.7; text-align: center;
+  }
+
+  /* 时间轴滚动区 */
+  #scrollOuter { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; }
+  #scrollOuter::-webkit-scrollbar { width: 10px; }
+  #scrollOuter::-webkit-scrollbar-thumb { background: #bdd3c8; border-radius: 5px; border: 2px solid #eef4f1; }
+  #scrollOuter::-webkit-scrollbar-track { background: transparent; }
+  #scrollArea { position: relative; min-width: 100%; }
+
+  #rulerCanvas, #waveCanvas { position: absolute; top: 0; display: block; }
+  #rulerCanvas { left: 0; background: #eaf1ed; z-index: 2; cursor: default; }
+  #waveCanvas {
+    background:
+      repeating-linear-gradient(to bottom, transparent 0, transparent 39px, rgba(67,217,150,.07) 39px, rgba(67,217,150,.07) 40px);
+    z-index: 1; cursor: pointer;
+  }
+
+  /* 播放头 */
+  #playhead {
+    position: absolute; left: 0; right: 0; height: 0;
+    border-top: 2px solid #ef4444; z-index: 6; pointer-events: none;
+  }
+  #playhead::before {
+    content: ""; position: absolute; left: 0; top: -7px;
+    border: 6px solid transparent; border-left: 9px solid #ef4444;
+  }
+
+  /* 歌词 → 波形引线层 */
+  #connectorLayer { position: absolute; top: 0; left: 0; right: 0; z-index: 3; pointer-events: none; }
+  .connector {
+    position: absolute; border-top: 2px solid #57c69b; transition: border-color .12s;
+  }
+  .connector::before {
+    content: ""; position: absolute; left: -6px; top: -5px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #0d9b6a; border: 1.5px solid #fff;
+    box-shadow: 0 0 0 1px rgba(13,155,106,.45);
+  }
+  .connector.sel { border-top-color: #0b8a63; }
+  .connector.sel::before { background: #0b8a63; box-shadow: 0 0 0 1.5px rgba(11,138,99,.5); }
+
+  /* 歌词卡片层 */
+  #lyricsLayer { position: absolute; top: 0; z-index: 4; cursor: crosshair; }
+
+  /* 多选框选（竖向时间带，命中其范围内的歌词块） */
+  #marquee {
+    position: absolute; left: 0; right: 0; height: 0; top: 0;
+    background: rgba(13,155,106,.12); pointer-events: none;
+    border-top: 1.5px solid #0d9b6a; border-bottom: 1.5px solid #0d9b6a;
+    z-index: 45; display: none;
+  }
+
+  /* 歌词块卡片：一个时间点 = 一张卡片，内部可堆叠多行（多语言） */
+  .card {
+    position: absolute; left: 8px; right: 18px;
+    display: flex; align-items: stretch;
+    background: #fff; border: 1px solid #d8e8e1; border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(30,41,90,.08);
+    cursor: grab; overflow: hidden;
+    transition: border-color .12s, box-shadow .12s;
+  }
+  .card:hover { border-color: #6fd0a8; }
+  .card.selected { border-color: #0d9b6a; box-shadow: 0 0 0 2px rgba(13,155,106,.22); }
+  .card.dragging { cursor: grabbing; box-shadow: 0 6px 16px rgba(30,41,90,.22); z-index: 30; border-color: #0d9b6a; }
+  .card .badge {
+    flex: none; width: 68px; display: flex; align-items: center; justify-content: center;
+    background: #e3f6ee; color: #0b8a63; cursor: pointer;
+    font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 600;
+    border-right: 1px solid #d9ece4; text-align: center;
+  }
+  .card.selected .badge { background: #0d9b6a; color: #fff; }
+  .card .body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .card .row { height: 24px; display: flex; align-items: center; }
+  .card .row + .row { border-top: 1px solid #f0f2f9; }
+  .card .row input {
+    flex: 1; min-width: 0; height: 100%; border: none; outline: none; background: transparent;
+    font-size: 13.5px; color: #1f2937; padding: 0 6px; cursor: text; font-family: inherit;
+  }
+  /* 行尾操作组：✕ 删除此行 + ＋ 在此行下方插入新行 */
+  .card .row .rowOps {
+    flex: none; display: flex; align-items: stretch; height: 100%;
+    opacity: 0; transition: opacity .12s;
+  }
+  .card .row:hover .rowOps,
+  .card.selected .row .rowOps,
+  .card .row:focus-within .rowOps { opacity: 1; }
+  .card .row .rowOps button {
+    width: 20px; border: none; background: transparent; padding: 0;
+    color: #b6c0d4; font-size: 12px; cursor: pointer; line-height: 1;
+  }
+  .card .row .rowOps button + button { border-left: 1px solid #eef1f8; }
+  .card .row .rowOps .addRow:hover { color: #0b8a63; background: #e3f6ee; }
+  .card .row .rowOps .delRow:hover { color: #ef4444; background: #fef2f2; }
+
+  /* 播放高亮：当前播放到的歌词（最后一个 startTime ≤ 播放时间的块）文字变绿 */
+  .card.active .row input { color: #0d9b6a; font-weight: 700; }
+  .card.active .badge { background: #0d9b6a; color: #fff; }
+
+  /* 双声道模式的 L/R 通道浮层标签 */
+  #chanLabel {
+    position: absolute; top: 8px; left: 58px; width: 230px;
+    display: none; align-items: center; justify-content: space-between;
+    padding: 0 10px; z-index: 5; pointer-events: none;
+  }
+  #chanLabel span {
+    font-size: 11px; font-weight: 700; letter-spacing: .5px;
+    background: rgba(255,255,255,.75); border-radius: 4px; padding: 1px 6px;
+  }
+  #chanLabel .c-l { color: #0e9f6e; }
+  #chanLabel .c-r { color: #0b7f5f; }
+
+  /* 拖放遮罩 */
+  #dropOverlay {
+    position: fixed; inset: 0; background: rgba(13,155,106,.14); backdrop-filter: blur(2px);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+    border: 3px dashed #0d9b6a; margin: 12px; border-radius: 18px;
+  }
+  #dropOverlay.show { display: flex; }
+  #dropOverlay .msg {
+    background: #fff; padding: 22px 40px; border-radius: 14px;
+    font-size: 16px; color: #0b8a63; font-weight: 600;
+    box-shadow: 0 10px 30px rgba(30,41,90,.18);
+  }
+
+  /* Toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%) translateY(20px);
+    background: #1f2937; color: #fff; font-size: 13px; padding: 9px 18px; border-radius: 8px;
+    opacity: 0; pointer-events: none; transition: all .25s; z-index: 200; max-width: 80vw;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 导出弹窗 */
+  #exportModal {
+    position: fixed; inset: 0; background: rgba(15,23,42,.45);
+    display: none; align-items: center; justify-content: center; z-index: 150;
+  }
+  #exportModal.show { display: flex; }
+  #exportModal .panel {
+    width: min(620px, 90vw); background: #fff; border-radius: 14px; padding: 20px;
+    box-shadow: 0 20px 50px rgba(15,23,42,.3);
+  }
+  #exportModal h3 { font-size: 15px; color: #1f2937; margin-bottom: 12px; }
+  #exportModal textarea {
+    width: 100%; height: 300px; border: 1px solid #d2e2da; border-radius: 8px;
+    padding: 10px; font-family: Consolas, monospace; font-size: 13px; line-height: 1.7;
+    resize: vertical; outline: none; color: #334155; background: #fbfdfc;
+  }
+  #exportModal textarea:focus { border-color: #0d9b6a; }
+  #exportModal .ops { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end; }
+  #exportModal .meta-note {
+    margin-top: 12px; padding-top: 10px; border-top: 1px dashed #dde7e1;
+    font-size: 12px; color: #8a94a6; line-height: 1.9; text-align: left;
+  }
+  #exportModal .meta-note code {
+    font-family: Consolas, monospace; font-size: 11.5px; color: #6f8b7d; background: #f0f6f3;
+    padding: 1px 5px; border-radius: 4px; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><img class="logo" src="images/logo.png" alt="logo">King LRC Waveform Editor<span class="zh">- LRC波形编辑器</span></h1>
+  <div class="sep"></div>
+  <div class="toolbar-group">
+    <button class="btn" id="btnOpenAudio">打开音频</button>
+    <button class="btn" id="btnOpenLrc">导入 LRC</button>
+    <button class="btn" id="btnDemo">加载示例</button>
+  </div>
+  <span id="fileInfo"></span>
+  <div class="hdr-br"></div>
+  <div class="toolbar-group grow">
+    <button class="btn icon" id="btnPlay" title="播放/暂停 (空格)">
+      <svg class="ic ic-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      <svg class="ic ic-pause" viewBox="0 0 24 24"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>
+    </button>
+    <span class="time" id="timeCur">00:00.00</span>
+    <input type="range" id="seekBar" min="0" max="0" step="any" value="0" disabled title="播放进度（可拖拽跳转）">
+    <span class="time" id="timeTotal">00:00.00</span>
+    <select class="btn" id="rateSel" title="播放速度 · 按 Tab 键在 0.5x / 1x 间快速切换（对齐辅助）">
+      <option value="2">2x</option>
+      <option value="1.5">1.5x</option>
+      <option value="1" selected>1x</option>
+      <option value="0.75">0.75x</option>
+      <option value="0.5">0.5x</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="chkFollow">跟随播放</label>
+  </div>
+  <div class="sep"></div>
+  <div class="toolbar-group">
+    <button class="btn icon" id="btnZoomOut" title="缩小">−</button>
+    <span id="zoomLabel" style="font-size:12px;color:#7b8aa5;min-width:60px;text-align:center;cursor:default" title="在波形上滚动滚轮缩放 · Ctrl+滚轮 任意位置缩放">60 像素/秒</span>
+    <button class="btn icon" id="btnZoomIn" title="放大">＋</button>
+  </div>
+  <div class="sep"></div>
+  <div class="toolbar-group">
+    <div class="seg">
+      <button id="btnChanMono" class="on" title="左右声道合并为一条波形">单声道</button>
+      <button id="btnChanStereo" title="左声道 / 右声道分开显示">双声道</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="toolbar-group">
+    <div class="seg">
+      <button id="btnViewWave" class="on" title="波形 + 歌词卡片；拖卡片对时间轴 · 在空白处拖框可框选多条一起拖">波形编辑</button>
+      <button id="btnViewLyric" title="隐藏波形，纯文字编辑校对歌词">歌词编辑</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="toolbar-group">
+    <button class="btn" id="btnAddLrc" title="在播放头位置添加歌词">＋ 添加歌词</button>
+    <button class="btn" id="btnClearLrc">清空歌词</button>
+    <button class="btn primary" id="btnExport">导出 LRC</button>
+  </div>
+</header>
+
+<main>
+  <div id="dropHint">
+    <div id="dhCard">
+      <div class="big"><img src="images/logo.png" alt="logo"></div>
+      <h2>把音频文件 / LRC 文件拖到这里</h2>
+      <p>
+        支持 mp3 / wav / ogg / flac / m4a 等格式<br>
+        可以把音频 + LRC 一起拖入
+      </p>
+      <div class="btns">
+        <button class="btn" id="btnOpenAudio2">选择音频文件</button>
+        <button class="btn" id="btnDemo2">没有文件？生成示例歌曲</button>
+      </div>
+    </div>
+    <div id="helpPanel">
+      <div class="hp-cols">
+        <div class="hp-group">
+          <h4>🖱 鼠标快捷操作</h4>
+          <ol>
+            <li>1. 鼠标滚轮在波形区域可缩放波形；</li>
+            <li>2. 鼠标滚轮在歌词区域可滚动歌词；</li>
+            <li>3. 歌曲播放时，点击波形图切换当前播放位置；</li>
+            <li>4. 歌词条可框选多个，进行拖拽、复制粘贴和删除操作；</li>
+            <li>5. 波形区域快速双击，新建歌词条。</li>
+          </ol>
+        </div>
+        <div class="hp-group">
+          <h4>⌨ 键盘快捷操作</h4>
+          <ol>
+            <li>1. <kbd>Ctrl</kbd> + <kbd>鼠标滚轮</kbd>：可任意位置缩放波形。</li>
+            <li>2. <kbd>空格</kbd>：歌曲播放和暂停切换。</li>
+            <li>3. <kbd>Delete</kbd>：删除选择的歌词条（可删除多条）。</li>
+            <li>4. <kbd>Tab</kbd>：切换播放速度。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scrollOuter" style="display:none">
+    <div id="scrollArea">
+      <canvas id="rulerCanvas"></canvas>
+      <canvas id="waveCanvas"></canvas>
+      <div id="connectorLayer"></div>
+      <div id="lyricsLayer"></div>
+      <div id="playhead"></div>
+      <div id="marquee"></div>
+    </div>
+  </div>
+  <div id="lyricPanel">
+    <div class="lp-bar"></div>
+    <textarea id="lyricEditor" spellcheck="false"
+      placeholder="整篇歌词会以 LRC 文本形式显示在这里，你可以自由增删改文字和时间。&#10;&#10;例如：&#10;[00:12.34]第一句歌词&#10;[00:12.34]First line of lyric（同一时间两行 = 双语同轴）&#10;[00:17.00]第二句歌词&#10;&#10;把不带 [时间] 的整段文字贴进来，点「✔ 应用修改」会按顺序均匀铺满整首歌。&#10;改完记得点「✔ 应用修改」或按 Ctrl+S 同步到波形。"></textarea>
+    <div class="lp-actions">
+      <span class="hint">标识标签：<code>[ti:歌名]</code> <code>[ar:歌手]</code> <code>[al:专辑]</code> <code>[by:作曲]</code> <code>[offset:时间补偿值]</code><br>歌词标签：<code>[00:12.34]歌词文字</code> · 同一时间两行 = 双语同轴</span>
+      <span class="btns">
+        <!-- 重新载入按钮已隐藏（功能保留）：如需恢复，删除下方 style="display:none" 即可 -->
+        <button class="btn" id="lpReload" style="display:none" title="放弃文本框里的改动，重新载入当前已应用的歌词">重新载入</button>
+        <button class="btn primary" id="lpApply" title="把文本框内容解析并同步到波形数据（快捷键 Ctrl+S）">✔ 应用修改</button>
+      </span>
+    </div>
+  </div>
+  <div id="chanLabel"><span class="c-l">L 左声道</span><span class="c-r">R 右声道</span></div>
+</main>
+
+<footer>
+  <span class="ver">v1.0.0</span>
+  <span class="slogan">但行好事，莫问前程。前路有光，初心莫忘。（作者：<a href="http://nm.tkcb.cc/" target="_blank" rel="noopener">TKCB-Nm</a>，官网：<a href="http://king.tkcb.cc/" target="_blank" rel="noopener">king.tkcb.cc</a>，Github：<a href="https://github.com/TKCB" target="_blank" rel="noopener">TKCB</a>）</span>
+</footer>
+
+<input type="file" id="audioFileInput" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a,.aac" hidden>
+<input type="file" id="lrcFileInput" accept=".lrc,.txt" hidden>
+<audio id="audio"></audio>
+
+<div id="dropOverlay"><div class="msg">松开鼠标，加载文件 🎵</div></div>
+<div id="toast"></div>
+
+<div id="exportModal">
+  <div class="panel">
+    <h3>导出 LRC 歌词</h3>
+    <textarea id="exportText" readonly spellcheck="false"></textarea>
+    <div class="ops">
+      <button class="btn" id="btnCopyLrc">复制到剪贴板</button>
+      <button class="btn primary" id="btnDownloadLrc">下载 .lrc 文件</button>
+      <button class="btn" id="btnCloseExport">关闭</button>
+    </div>
+    <div class="meta-note">
+      标识标签：
+      <code>[ti:歌名]</code> <code>[ar:歌手]</code> <code>[al:专辑]</code> <code>[by:作曲]</code> <code>[offset:时间补偿值]</code>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 全局状态 ================= */
+const state = {
+  pps: 60,               // 缩放：像素/秒
+  PEAK_RES: 100,         // 波形峰值采样精度（每秒采样数）
+  peaks: null,           // { L: Float32Array, R: Float32Array }
+  chan: 'mono',          // 'mono' 合并 | 'stereo' 双声道
+  duration: 0,
+  fileName: '',
+  meta: { ti: '', ar: '', al: '', by: '', offset: '' },  // LRC 标识标签（导出时固定在歌词上方）
+  blocks: [],            // 歌词块：{ time, texts:[{text,row,input}...], el, badgeEl, connEl }
+  loaded: false,
+};
+const RULER_W = 58, WAVE_W = 230, MAX_CANVAS_H = 28000;
+const ROW_H = 24, CARD_BORDER = 2;   // 卡片行高/卡片边框（操作按钮收在行内，无底栏）
+const selSet = new Set();            // 多选集合：当前被选中的歌词块（框选/点选后可整组拖拽）
+
+const $ = id => document.getElementById(id);
+const audio = $('audio');
+const scrollOuter = $('scrollOuter'), scrollArea = $('scrollArea');
+const rulerCv = $('rulerCanvas'), waveCv = $('waveCanvas');
+const lyricsLayer = $('lyricsLayer'), connectorLayer = $('connectorLayer'), playheadEl = $('playhead');
+const marqueeEl = $('marquee');
+
+/* ================= 工具函数 ================= */
+function fmt(t) {
+  if (!isFinite(t) || t < 0) t = 0;
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  const cs = Math.floor((t - Math.floor(t)) * 100);
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0') + '.' + String(cs).padStart(2,'0');
+}
+function effPps() {
+  if (!state.duration) return state.pps;
+  return Math.min(state.pps, MAX_CANVAS_H / state.duration);
+}
+function timeH() { return Math.max(200, Math.ceil(state.duration * effPps())); }
+
+let toastTimer;
+function toast(msg) {
+  const el = $('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+/* ================= 音频加载与波形 ================= */
+async function loadAudioFile(file) {
+  try {
+    toast('正在解码音频…');
+    const ab = await file.arrayBuffer();
+    const tmpCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const audioBuf = await tmpCtx.decodeAudioData(ab);
+    tmpCtx.close();
+    applyAudio(audioBuf, URL.createObjectURL(file), file.name);
+  } catch (e) {
+    console.error(e);
+    toast('音频解码失败：' + (e.message || '不支持的格式'));
+  }
+}
+
+function applyAudio(audioBuf, srcUrl, name) {
+  state.peaks = computePeaks(audioBuf);
+  state.duration = audioBuf.duration;
+  state.fileName = name;
+  state.loaded = true;
+  if (audio.src) URL.revokeObjectURL(audio.src);
+  audio.src = srcUrl;
+  audio.currentTime = 0;
+  const seek = $('seekBar');
+  seek.max = state.duration; seek.value = 0; seek.disabled = false;
+  $('timeTotal').textContent = fmt(state.duration);
+  $('timeCur').textContent = fmt(0);
+  state.blocks.forEach(b => { if (b.time > state.duration) b.time = Math.max(0, state.duration - 0.5); });
+  $('fileInfo').textContent = '📄 ' + name;
+  $('dropHint').style.display = 'none';
+  scrollOuter.style.display = 'block';
+  renderAll();
+  $('chanLabel').style.display = (state.chan === 'stereo') ? 'flex' : 'none';
+  toast('已加载：' + name);
+}
+
+function computePeaks(audioBuf) {
+  // 左右声道分开采样，供「合并/双声道」两种显示模式使用
+  const n = Math.max(1, Math.ceil(audioBuf.duration * state.PEAK_RES));
+  const L = new Float32Array(n), R = new Float32Array(n);
+  const chL = audioBuf.getChannelData(0);
+  const chR = audioBuf.numberOfChannels > 1 ? audioBuf.getChannelData(1) : null;
+  const len = audioBuf.length, spp = len / n;
+  for (let i = 0; i < n; i++) {
+    const s = Math.floor(i * spp), e = Math.min(len, Math.floor((i + 1) * spp));
+    const stride = Math.max(1, Math.floor((e - s) / 40));
+    let mL = 0, mR = 0;
+    for (let j = s; j < e; j += stride) {
+      const vL = Math.abs(chL[j]);
+      if (vL > mL) mL = vL;
+      if (chR) { const vR = Math.abs(chR[j]); if (vR > mR) mR = vR; }
+    }
+    L[i] = mL;
+    R[i] = chR ? mR : mL;   // 单声道音频：右声道与左相同
+  }
+  return { L, R };
+}
+
+/* 取峰值数组 [i0, i1) 内最大 */
+function rowPeak(arr, i0, i1) {
+  let max = 0;
+  for (let i = i0; i < i1; i++) if (arr[i] > max) max = arr[i];
+  return max;
+}
+
+/* ================= 绘制 ================= */
+function renderAll() {
+  const h = timeH();
+  scrollArea.style.height = h + 'px';
+  lyricsLayer.style.left = (RULER_W + WAVE_W) + 'px';
+  lyricsLayer.style.right = '0px';
+  lyricsLayer.style.height = h + 'px';
+  connectorLayer.style.height = h + 'px';
+  drawRuler(h);
+  drawWave(h);
+  state.blocks.forEach(b => positionBlock(b));
+  playheadEl.style.top = (audio.currentTime * effPps()) + 'px';
+  $('zoomLabel').textContent = Math.round(effPps()) + ' 像素/秒';
+}
+
+function drawRuler(h) {
+  rulerCv.width = RULER_W; rulerCv.height = h;
+  rulerCv.style.left = '0';
+  const ctx = rulerCv.getContext('2d');
+  ctx.clearRect(0, 0, RULER_W, h);
+  const pps = effPps();
+  const minor = pps >= 35 ? 1 : 5;
+  const major = pps >= 90 ? 5 : (pps >= 35 ? 10 : 30);
+  ctx.font = '11px Consolas, monospace';
+  ctx.textBaseline = 'middle';
+  for (let t = 0; t <= state.duration; t += minor) {
+    const y = Math.round(t * pps) + 0.5;
+    const isMajor = Math.abs(t % major) < 1e-6;
+    ctx.strokeStyle = isMajor ? '#7f9d8f' : '#c6d8cf';
+    ctx.beginPath();
+    ctx.moveTo(RULER_W - (isMajor ? 14 : 7), y);
+    ctx.lineTo(RULER_W, y);
+    ctx.stroke();
+    if (isMajor) {
+      ctx.fillStyle = '#5d786c';
+      ctx.textAlign = 'right';
+      ctx.fillText(fmt(t).slice(0, 5), RULER_W - 18, y);
+    }
+  }
+}
+
+function drawWave(h) {
+  waveCv.width = WAVE_W; waveCv.height = h;
+  waveCv.style.left = RULER_W + 'px';
+  const ctx = waveCv.getContext('2d');
+  ctx.clearRect(0, 0, WAVE_W, h);
+  if (!state.peaks) return;
+  const pps = effPps(), n = state.peaks.L.length;
+  const mid = WAVE_W / 2;
+  const idx = y => {
+    const i0 = Math.floor(y / pps * state.PEAK_RES);
+    return { i0, i1: Math.min(n, Math.max(i0 + 1, Math.ceil((y + 1) / pps * state.PEAK_RES))) };
+  };
+
+  if (state.chan === 'mono') {
+    // 合并单声道：左右取大，关于中轴对称
+    ctx.fillStyle = '#0d9b6a';
+    const maxAmp = mid - 8;
+    for (let y = 0; y < h; y++) {
+      const { i0, i1 } = idx(y);
+      let max = 0;
+      for (let i = i0; i < i1; i++) {
+        const v = state.peaks.L[i] > state.peaks.R[i] ? state.peaks.L[i] : state.peaks.R[i];
+        if (v > max) max = v;
+      }
+      const amp = Math.max(1, max * maxAmp);
+      ctx.fillRect(mid - amp, y, amp * 2, 1);
+    }
+  } else {
+    // 双声道：左亮绿右深青绿，中轴分界
+    const maxAmp = mid - 8;
+    ctx.fillStyle = '#c8efda';
+    ctx.fillRect(mid - 0.5, 0, 1, h);
+    ctx.fillStyle = '#43d996';
+    for (let y = 0; y < h; y++) {
+      const { i0, i1 } = idx(y);
+      const amp = Math.max(1, rowPeak(state.peaks.L, i0, i1) * maxAmp);
+      ctx.fillRect(mid - amp, y, amp, 1);
+    }
+    ctx.fillStyle = '#0d9b6a';
+    for (let y = 0; y < h; y++) {
+      const { i0, i1 } = idx(y);
+      const amp = Math.max(1, rowPeak(state.peaks.R, i0, i1) * maxAmp);
+      ctx.fillRect(mid, y, amp, 1);
+    }
+  }
+}
+
+function setChan(c) {
+  state.chan = c;
+  $('btnChanMono').classList.toggle('on', c === 'mono');
+  $('btnChanStereo').classList.toggle('on', c === 'stereo');
+  $('chanLabel').style.display = (c === 'stereo' && state.loaded) ? 'flex' : 'none';
+  if (state.loaded) drawWave(timeH());
+}
+$('btnChanMono').addEventListener('click', () => setChan('mono'));
+$('btnChanStereo').addEventListener('click', () => setChan('stereo'));
+
+/* ================= 歌词块（一个时间点 = 多行文本） ================= */
+function blockHeight(b) { return b.texts.length * ROW_H + CARD_BORDER; }
+
+function positionBlock(b) {
+  const h = blockHeight(b);
+  b.el.style.height = h + 'px';
+  b.el.style.top = Math.max(0, Math.round(b.time * effPps() - h / 2)) + 'px';
+  b.badgeEl.textContent = fmt(b.time);
+  // 引线对准波形中轴线上的精确时间点
+  const x0 = RULER_W + WAVE_W / 2, x1 = RULER_W + WAVE_W;
+  b.connEl.style.left = x0 + 'px';
+  b.connEl.style.top = (b.time * effPps()) + 'px';
+  b.connEl.style.width = Math.max(0, x1 - x0) + 'px';
+}
+
+/* 选择工具：selSet 为多选集合，可含多块；框选后拖其中任意一块 = 整组平移 */
+function selSync(b, on) {
+  b.el.classList.toggle('selected', on);
+  b.connEl.classList.toggle('sel', on);
+}
+function selClear() {
+  selSet.forEach(b => selSync(b, false));
+  selSet.clear();
+}
+function selOnly(b) {
+  if (selSet.size === 1 && selSet.has(b)) return;   // 已是唯一选中，保持（避免打断徽章单击跳播等）
+  selClear();
+  selSet.add(b);
+  selSync(b, true);
+}
+
+/* 歌词剪贴板：Ctrl/Cmd+C 复制选中歌词（块内含同时间多行），Ctrl/Cmd+V 粘贴到当前播放头时间 */
+let clipItems = null;              // [{time, lines}]，lines 为纯文本行；多块按组内最早时间保持相对间距
+function copySel() {
+  if (!selSet.size) {
+    if (state.blocks.length) toast('未选中歌词：先点选或框选，再按 Ctrl+C');
+    return;
+  }
+  clipItems = [...selSet]
+    .map(b => ({ time: b.time, lines: b.texts.map(t => t.text) }))
+    .sort((a, b) => a.time - b.time);
+  toast('已复制 ' + clipItems.length + ' 条歌词' + (clipItems.length > 1 ? '，保持相对时间' : ''));
+}
+function pasteAtPlayhead() {
+  if (!clipItems || !clipItems.length) return;
+  if (!state.loaded) { toast('先加载音频，播放头才有时间位置'); return; }
+  const anchor = Math.max(0, Math.min(audio.currentTime || 0, state.duration));
+  const base = clipItems[0].time;                  // 组内最早时间 → 对齐到播放头
+  selClear();
+  clipItems.forEach(c => {
+    const blk = createBlock(anchor + (c.time - base), c.lines, false);
+    selSet.add(blk);
+    selSync(blk, true);
+  });
+  state.blocks.sort((a, b) => a.time - b.time);
+  toast('已粘贴 ' + clipItems.length + ' 条到播放头 ' + fmt(anchor));
+}
+
+function removeBlock(b) {
+  if (activeBlock === b) activeBlock = null;
+  b.el.remove();
+  b.connEl.remove();
+  state.blocks = state.blocks.filter(x => x !== b);
+  selSet.delete(b);
+}
+
+/* 重建卡片 body（每行行尾自带 ✕删除 / ＋插入新行） */
+function rebuildBody(b, focusIdx = -1) {
+  const body = b.bodyEl;
+  body.innerHTML = '';
+  b.texts.forEach((t, i) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const input = document.createElement('input');
+    input.value = t.text;
+    input.spellcheck = false;
+    input.placeholder = i === 0 ? '输入歌词…' : '输入另一语言…';
+    const ops = document.createElement('div');
+    ops.className = 'rowOps';
+    const del = document.createElement('button');
+    del.className = 'delRow';
+    del.textContent = '✕';
+    del.title = '删除此行';
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      if (b.texts.length <= 1) removeBlock(b);
+      else { b.texts.splice(i, 1); rebuildBody(b); positionBlock(b); }
+    });
+    const add = document.createElement('button');
+    add.className = 'addRow';
+    add.textContent = '＋';
+    add.title = '在此行下方插入一行（同一时间，如另一语言）';
+    add.addEventListener('click', e => {
+      e.stopPropagation();
+      insertRow(b, i + 1);
+    });
+    ops.appendChild(del);
+    ops.appendChild(add);
+    input.addEventListener('input', () => { t.text = input.value; });
+    input.addEventListener('focus', () => { if (!selSet.has(b)) selOnly(b); });
+    input.addEventListener('pointerdown', e => e.stopPropagation()); // 输入框内不触发拖拽
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && input.value.trim()) { // 回车：在该行下方插入一行
+        e.preventDefault();
+        insertRow(b, i + 1);
+      }
+    });
+    row.appendChild(input);
+    row.appendChild(ops);
+    body.appendChild(row);
+    t.row = row; t.input = input;
+  });
+  // 聚焦但不自动滚动：双击波形/歌词空白新建后直接可输入，避免页面跳动
+  if (focusIdx >= 0 && b.texts[focusIdx]) b.texts[focusIdx].input.focus({ preventScroll: true });
+  positionBlock(b);
+}
+
+/* 在指定位置插入一行并聚焦 */
+function insertRow(b, idx) {
+  b.texts.splice(idx, 0, { text: '' });
+  rebuildBody(b, idx);
+}
+
+/* 创建歌词块卡片；focusFirst=true 时聚焦第一行输入框 */
+function createBlock(time, lines, focusFirst = false) {
+  const t = Math.max(0, Math.min(time, state.duration || 1e9));
+  const b = {
+    time: t,
+    texts: (lines.length ? lines : ['']).map(x => ({ text: String(x || '') })),
+  };
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = '<div class="badge"></div><div class="body"></div>';
+  b.el = card;
+  b.badgeEl = card.querySelector('.badge');
+  b.bodyEl = card.querySelector('.body');
+  // 引线
+  b.connEl = document.createElement('div');
+  b.connEl.className = 'connector';
+  connectorLayer.appendChild(b.connEl);
+  // 拖拽（badge / 卡片空白处）：点未选中卡 = 单选它；点已选中卡 = 保留多选、整组一起平移
+  let startY = 0, startTimes = null, dragSet = [], moved = false, dragging = false;
+  card.addEventListener('pointerdown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.target.closest('.rowOps')) return;
+    e.preventDefault();
+    if (!selSet.has(b)) selOnly(b);            // 该卡不在多选内 → 重新单选
+    dragSet = [...selSet];                     // 快照本次要一起移动的整组
+    startTimes = dragSet.map(x => x.time);
+    startY = e.clientY; moved = false; dragging = true;
+    card.setPointerCapture(e.pointerId);
+  });
+  card.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dy = e.clientY - startY;
+    if (!moved && Math.abs(dy) < 4) return;
+    moved = true;
+    card.classList.add('dragging');
+    const pps = effPps();
+    dragSet.forEach((blk, i) => {
+      blk.time = Math.max(0, Math.min(startTimes[i] + dy / pps, state.duration));
+      positionBlock(blk);
+    });
+  });
+  const endDrag = e => {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove('dragging');
+    if (moved) {
+      state.blocks.sort((a, b2) => a.time - b2.time);
+    } else if (e.target.classList.contains('badge')) {
+      audio.currentTime = b.time;   // 单击徽章：跳转播放
+      if (audio.paused) { audio.play(); setPlayIcon(true); }
+    }
+  };
+  card.addEventListener('pointerup', endDrag);
+  card.addEventListener('pointercancel', () => { dragging = false; card.classList.remove('dragging'); });
+
+  lyricsLayer.appendChild(card);
+  state.blocks.push(b);
+  rebuildBody(b, focusFirst ? 0 : -1);
+  return b;
+}
+
+/* ================= 波形交互 ================= */
+function eventTime(e) {
+  const rect = waveCv.getBoundingClientRect();
+  return Math.max(0, Math.min((e.clientY - rect.top) / effPps(), state.duration));
+}
+waveCv.addEventListener('click', e => { audio.currentTime = eventTime(e); });
+waveCv.addEventListener('dblclick', e => { createBlock(eventTime(e), [''], true); });
+lyricsLayer.addEventListener('dblclick', e => {
+  if (e.target !== lyricsLayer) return;
+  const rect = lyricsLayer.getBoundingClientRect();
+  createBlock((e.clientY - rect.top) / effPps(), [''], true);
+});
+
+/* ================= 框选多选 =================
+   在波形/尺子/歌词区空白按下并拖出一个竖向时间带，释放后选中时间带内所有歌词块；
+   之后拖其中任意一块 → 整组平移（见卡片拖拽）。
+   单击歌词列空白 = 清空选择；框选结束后吞掉随之而来的 click，避免误触发波形单击跳播。 */
+let marqueeActive = false, marqueeMoved = false, mqDownTarget = null;
+let mqStartY = 0, mqCurY = 0, mqUpStamp = 0, mqClientY = 0, mqAutoTimer = null;
+
+function mqContentY() {          // 视口 y → scrollArea 内容坐标
+  return mqClientY - scrollArea.getBoundingClientRect().top;
+}
+function mqRefreshBox() {
+  mqCurY = Math.max(0, Math.min(mqContentY(), scrollArea.offsetHeight));
+  const y0 = Math.min(mqStartY, mqCurY), y1 = Math.max(mqStartY, mqCurY);
+  marqueeEl.style.top = y0 + 'px';
+  marqueeEl.style.height = Math.max(0, y1 - y0) + 'px';
+}
+function mqStopAuto() {
+  if (mqAutoTimer) { clearInterval(mqAutoTimer); mqAutoTimer = null; }
+}
+scrollArea.addEventListener('pointerdown', e => {
+  if (!state.loaded || lyricMode) return;
+  if (e.button !== 0) return;
+  if (e.target.closest('.card') || e.target.closest('.rowOps')) return;
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SELECT') return;
+  mqDownTarget = e.target;
+  mqClientY = e.clientY;
+  mqStartY = Math.max(0, Math.min(mqContentY(), scrollArea.offsetHeight));
+  mqCurY = mqStartY;
+  marqueeMoved = false;
+  marqueeEl.style.top = mqStartY + 'px';
+  marqueeEl.style.height = '0px';
+  marqueeEl.style.display = 'block';
+  marqueeActive = true;
+});
+window.addEventListener('pointermove', e => {
+  if (!marqueeActive) return;
+  mqClientY = e.clientY;
+  if (!marqueeMoved && Math.abs(mqContentY() - mqStartY) < 4) return;
+  marqueeMoved = true;
+  mqRefreshBox();
+  // 贴近视口上下沿时自动滚动，便于跨屏框选
+  if (!mqAutoTimer) {
+    const ro = scrollOuter.getBoundingClientRect();
+    const near = mqClientY < ro.top + 30 || mqClientY > ro.bottom - 30;
+    if (near) {
+      mqAutoTimer = setInterval(() => {
+        const r = scrollOuter.getBoundingClientRect();
+        let d = 0;
+        if (mqClientY < r.top + 30) d = -16;
+        else if (mqClientY > r.bottom - 30) d = 16;
+        if (!d) return;
+        scrollOuter.scrollTop = Math.max(0, scrollOuter.scrollTop + d);
+        mqRefreshBox();
+      }, 24);
+    }
+  }
+});
+window.addEventListener('pointerup', e => {
+  if (!marqueeActive) return;
+  marqueeActive = false;
+  marqueeEl.style.display = 'none';
+  mqStopAuto();
+  mqClientY = e.clientY;
+  const y = Math.max(0, Math.min(mqContentY(), scrollArea.offsetHeight));
+  if (!marqueeMoved) {
+    // 原地单击：歌词列空白 → 清空选择（波形/尺子单击保持原行为：跳播 / 无）
+    if (mqDownTarget === lyricsLayer) selClear();
+    return;
+  }
+  const y0 = Math.min(mqStartY, y), y1 = Math.max(mqStartY, y);
+  const hit = state.blocks.filter(b => {
+    const t = b.el.offsetTop, btm = t + b.el.offsetHeight;
+    return btm >= y0 && t <= y1;
+  });
+  selClear();
+  hit.forEach(b => { selSet.add(b); selSync(b, true); });
+  mqUpStamp = e.timeStamp;    // 吞掉紧随其后的 click（避免触发波形单击跳播/其它背景点击）
+  setTimeout(() => { mqUpStamp = 0; }, 120);
+});
+window.addEventListener('pointercancel', () => {
+  marqueeActive = false;
+  marqueeEl.style.display = 'none';
+  mqStopAuto();
+});
+window.addEventListener('click', e => {
+  if (mqUpStamp && e.timeStamp - mqUpStamp < 100) {
+    mqUpStamp = 0;
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}, true);   // capture 阶段拦截，先于目标上的 click/dblclick 处理器
+
+/* ================= LRC 解析 / 导出 ================= */
+/* LRC 标识标签：导出时固定在歌词最上方；文件里没有的标签留空占位，便于用户自行填写 */
+const META_TAGS = ['ti', 'ar', 'al', 'by', 'offset'];
+const EMPTY_META = { ti: '', ar: '', al: '', by: '', offset: '' };
+
+function parseLRC(text) {
+  const tagged = [], plain = [];
+  const meta = Object.assign({}, EMPTY_META);
+  const tagRe = /\[(\d{1,3}):(\d{1,2}(?:\.\d{1,3})?)\]/g;
+  const metaRe = /^\[(ti|ar|al|by|offset):([^\]]*)\]/i;
+  for (let raw of text.split(/\r?\n/)) {
+    const metaM = metaRe.exec(raw.trim());
+    if (metaM) { meta[metaM[1].toLowerCase()] = metaM[2].trim(); continue; }
+    const line = raw.replace(/<\d{1,3}:\d{1,2}(?:\.\d{1,3})?>/g, ''); // 去逐字时间戳
+    const times = [];
+    let m; tagRe.lastIndex = 0;
+    while ((m = tagRe.exec(line))) times.push(parseInt(m[1]) * 60 + parseFloat(m[2]));
+    const body = line.replace(tagRe, '').trim();
+    if (times.length) {
+      if (body) for (const tm of times) tagged.push({ time: tm, text: body });
+    } else if (line.trim() && !/^\[(ti|ar|al|by|offset|re|ve|length):/i.test(line.trim())) {
+      plain.push(line.trim());
+    }
+  }
+  tagged.sort((a, b) => a.time - b.time);
+  return { tagged, plain, meta };
+}
+
+/* 把同一时间点的多行歌词合并成同一卡片 */
+function groupByTime(entries) {
+  const map = new Map();
+  for (const e of entries) {
+    const key = e.time.toFixed(3);
+    let g = map.get(key);
+    if (!g) { g = { time: e.time, lines: [] }; map.set(key, g); }
+    g.lines.push(e.text);
+  }
+  return [...map.values()].sort((a, b) => a.time - b.time);
+}
+
+function importLrcText(text, name) {
+  if (!state.loaded) { toast('请先加载音频，才能把歌词对齐到波形上'); return; }
+  if (lyricMode && lyricDirty && !confirm('导入新歌词会覆盖歌词文本，未应用的修改将丢失。\n\n「确定」：继续导入；「取消」：保留当前编辑')) return;
+  const { tagged, plain, meta } = parseLRC(text);
+  state.meta = meta;   // 记录文件里的 [ti][ar][al][by][offset] 标识（没有的保持空 → 导出时留空位）
+  state.blocks.slice().forEach(b => removeBlock(b));
+  if (tagged.length) {
+    const groups = groupByTime(tagged);
+    groups.forEach(g => createBlock(Math.min(g.time, state.duration), g.lines));
+    const rows = groups.reduce((s, g) => s + g.lines.length, 0);
+    toast(`已导入 ${rows} 行 / ${groups.length} 个时间点${rows > groups.length ? '（同时间多行已合并显示）' : ''}`);
+  } else if (plain.length) {
+    const n = plain.length;
+    const start = Math.min(3, state.duration * 0.05);
+    const end = Math.max(start + 1, state.duration - Math.min(4, state.duration * 0.05));
+    plain.forEach((txt, i) => {
+      const tm = n === 1 ? start : start + (end - start) * i / (n - 1);
+      createBlock(tm, [txt]);
+    });
+    toast(`已导入 ${n} 行（无时间标签，已均匀分布，可拖拽调整）`);
+  } else {
+    toast('未在文件中找到歌词内容');
+    return;
+  }
+  state.blocks.sort((a, b) => a.time - b.time);
+  if (state.blocks[0]) scrollToTime(state.blocks[0].time);
+  if (lyricMode) fillLyricEditor();   // 歌词模式下同步刷新文本编辑框
+}
+
+function clearBlocks(withToast = true) {
+  state.blocks.slice().forEach(b => removeBlock(b));
+  if (withToast) toast('已清空歌词');
+}
+
+/* ================= 纯歌词编辑模式（整篇文本自由编辑） ================= */
+const lyricPanel = $('lyricPanel'), lyricEditor = $('lyricEditor'), lyricBar = lyricPanel.querySelector('.lp-bar');
+let lyricMode = false, lyricDirty = false;   // lyricDirty = 文本框有未应用的修改
+
+function setView(mode) {
+  const toLyric = mode === 'lyric';
+  if (toLyric && !state.loaded) { toast('先加载一个音频文件吧'); return; }
+  // 从歌词模式切走时，若文本框有未应用的修改，先询问
+  if (!toLyric && lyricMode && lyricDirty) {
+    if (confirm('歌词文本有尚未应用的修改。\n\n「确定」：把文本框内容应用成新歌词，再回到波形模式\n「取消」：放弃文本框里的改动，按当前已应用的歌词返回')) applyLyricEditor();
+  }
+  lyricMode = toLyric;
+  $('btnViewWave').classList.toggle('on', !lyricMode);
+  $('btnViewLyric').classList.toggle('on', lyricMode);
+  if (!lyricMode) {
+    lyricPanel.classList.remove('open');
+    scrollOuter.style.display = 'block';
+    $('chanLabel').style.display = (state.chan === 'stereo') ? 'flex' : 'none';
+    refreshAllCards();       // 数据是唯一来源 → 重建波形卡片
+    renderAll();
+  } else {
+    scrollOuter.style.display = 'none';
+    $('chanLabel').style.display = 'none';
+    fillLyricEditor();       // 当前歌词数据 → 填充到文本编辑框
+    lyricPanel.classList.add('open');
+  }
+}
+$('btnViewWave').addEventListener('click', () => setView('wave'));
+$('btnViewLyric').addEventListener('click', () => setView('lyric'));
+
+/* 依据 state.blocks 数据重建波形层的所有卡片（数据是唯一来源） */
+function refreshAllCards() {
+  const snap = state.blocks.slice().sort((a, b) => a.time - b.time);
+  state.blocks.slice().forEach(b => { b.el.remove(); b.connEl.remove(); });
+  state.blocks = [];
+  selSet.clear();
+  snap.forEach(b => createBlock(b.time, b.texts.map(t => t.text), false));
+  state.blocks.sort((a, b) => a.time - b.time);
+}
+
+/* 把当前歌词数据渲染成 LRC 文本并填充进编辑框（丢弃未应用改动） */
+function fillLyricEditor() {
+  lyricDirty = false;
+  lyricEditor.value = buildLrcText();
+  updateLyricBar();
+}
+
+/* 刷新顶部统计栏（行数 / 时间点 / 未应用提示） */
+function updateLyricBar() {
+  const sorted = state.blocks.slice().sort((a, b) => a.time - b.time);
+  const totalRows = sorted.reduce((s, b) => s + b.texts.length, 0);
+  lyricBar.innerHTML = sorted.length
+    ? '<span>共 <b>' + totalRows + '</b> 行 · <b>' + sorted.length + '</b> 个时间点</span>'
+    : '<span>还没有歌词 —— 把 LRC 或纯文本歌词贴进来点「✔ 应用修改」</span>';
+  if (lyricDirty) {
+    const tag = document.createElement('span');
+    tag.className = 'dirty-tag';
+    tag.textContent = '✎ 有未应用的修改';
+    lyricBar.appendChild(tag);
+  }
+}
+
+/* 把文本框内容解析并同步为歌词数据（带 [时间] 对齐波形；整篇无时间戳则均匀分布） */
+function applyLyricEditor() {
+  const text = lyricEditor.value;
+  const { tagged, plain, meta } = parseLRC(text);
+  state.meta = meta;   // 整篇文本顶部可直接编辑标识标签，应用时同步回存
+  state.blocks.slice().forEach(b => removeBlock(b));
+  selSet.clear();
+  if (tagged.length) {
+    const groups = groupByTime(tagged);
+    groups.forEach(g => createBlock(Math.min(g.time, state.duration), g.lines));
+    const rows = groups.reduce((s, g) => s + g.lines.length, 0);
+    toast('已应用 ' + rows + ' 行 / ' + groups.length + ' 个时间点'
+      + (plain.length ? '（另有 ' + plain.length + ' 行无时间戳已跳过）' : ''));
+  } else if (plain.length) {
+    const n = plain.length, start = Math.min(3, state.duration * 0.05);
+    const end = Math.max(start + 1, state.duration - Math.min(4, state.duration * 0.05));
+    plain.forEach((txt, i) => {
+      const tm = n === 1 ? start : start + (end - start) * i / (n - 1);
+      createBlock(tm, [txt]);
+    });
+    toast('已应用 ' + n + ' 行（无时间戳，已按顺序均匀分布，可回波形模式微调）');
+  } else {
+    toast('文本框为空，歌词已清空');
+  }
+  state.blocks.sort((a, b) => a.time - b.time);
+  lyricDirty = false;
+  updateLyricBar();
+}
+
+$('lpApply').addEventListener('click', () => applyLyricEditor());
+$('lpReload').addEventListener('click', () => {
+  if (lyricDirty && !confirm('放弃文本框里的修改，重新载入当前已应用的歌词？')) return;
+  fillLyricEditor();
+  toast('已重新载入当前歌词');
+});
+lyricEditor.addEventListener('input', () => {
+  if (!lyricDirty) { lyricDirty = true; updateLyricBar(); }
+});
+lyricEditor.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+    e.preventDefault();
+    if (lyricEditor.value.trim() || state.blocks.length) applyLyricEditor();
+    else toast('文本框是空的，没有可应用的歌词');
+  }
+});
+
+/* 只收集歌词行（不含标识头），用于判断有无可导出内容 */
+function lyricRows() {
+  const rows = [];
+  state.blocks.slice().sort((a, b) => a.time - b.time).forEach(b => {
+    b.texts.forEach(t => { if (t.text.trim()) rows.push('[' + fmt(b.time) + ']' + t.text); });
+  });
+  return rows;
+}
+
+/* 完整 LRC 文本：标识标签在最上方，其后空一行再排歌词行 */
+function buildLrcText() {
+  const head = META_TAGS.map(k => '[' + k + ':' + (state.meta[k] || '') + ']').join('\n');
+  const rows = lyricRows();
+  return rows.length ? head + '\n\n' + rows.join('\n') : head;
+}
+
+/* ================= 播放控制 / 播放头 ================= */
+function setPlayIcon(playing) {
+  $('btnPlay').classList.toggle('playing', !!playing);
+}
+$('btnPlay').addEventListener('click', togglePlay);
+function togglePlay() {
+  if (!state.loaded) { toast('先加载一个音频文件吧'); return; }
+  if (audio.paused) { audio.play(); setPlayIcon(true); }
+  else { audio.pause(); setPlayIcon(false); }
+}
+audio.addEventListener('ended', () => setPlayIcon(false));
+// 播放开始即清空歌词选择：试听/校对时只保留「当前句」播放高亮，避免与选中态叠加
+audio.addEventListener('play', () => { if (selSet.size) selClear(); });
+$('rateSel').addEventListener('change', e => { audio.playbackRate = parseFloat(e.target.value); });
+
+/* 进度条：拖拽 seek；拖动过程中暂停自动刷新，避免抢操作 */
+const seekBar = $('seekBar');
+let seeking = false;
+seekBar.addEventListener('pointerdown', () => { seeking = true; });
+window.addEventListener('pointerup', () => { if (seeking) { seeking = false; seekBar.value = audio.currentTime; } });
+seekBar.addEventListener('input', () => {
+  if (!state.loaded) return;
+  const v = parseFloat(seekBar.value) || 0;
+  audio.currentTime = v;
+  $('timeCur').textContent = fmt(v);
+});
+
+function scrollToTime(t) {
+  scrollOuter.scrollTop = Math.max(0, t * effPps() - scrollOuter.clientHeight / 2);
+}
+
+/* ================= 播放跟随歌词高亮 ================= */
+let activeBlock = null;   // 当前正在播放（最后 startTime ≤ 播放时间）的歌词块
+
+function activeBlockAt(t) {          // blocks 已按 time 升序 → 从后往前找最后命中
+  const bs = state.blocks;
+  for (let i = bs.length - 1; i >= 0; i--) {
+    if (bs[i].time <= t) return bs[i];
+  }
+  return null;
+}
+function syncActiveLyric(t) {
+  if (activeBlock && activeBlock.el && !activeBlock.el.isConnected) activeBlock = null; // DOM 已被重建
+  const next = activeBlockAt(t);
+  if (next === activeBlock) return;
+  if (activeBlock && activeBlock.el) activeBlock.el.classList.remove('active');
+  activeBlock = next;
+  if (activeBlock && activeBlock.el) activeBlock.el.classList.add('active');
+}
+
+(function tick() {
+  const t = audio.currentTime || 0;
+  playheadEl.style.top = (t * effPps()) + 'px';
+  syncActiveLyric(t);
+  $('timeCur').textContent = fmt(t);
+  if (!seeking) seekBar.value = t;
+  if (!audio.paused && $('chkFollow').checked) {
+    const y = t * effPps();
+    const top = scrollOuter.scrollTop, bottom = top + scrollOuter.clientHeight;
+    if (y < top + 60 || y > bottom - 140) {
+      scrollOuter.scrollTop = Math.max(0, y - scrollOuter.clientHeight * 0.3);
+    }
+  }
+  requestAnimationFrame(tick);
+})();
+
+/* ================= 缩放 ================= */
+function setPps(v) {
+  state.pps = Math.max(12, Math.min(240, v));
+  renderAll();
+}
+function zoomAt(factor, clientY) {
+  const rect = scrollOuter.getBoundingClientRect();
+  const t = (clientY - rect.top + scrollOuter.scrollTop) / effPps();
+  state.pps = Math.max(12, Math.min(240, state.pps * factor));
+  renderAll();
+  scrollOuter.scrollTop = Math.max(0, t * effPps() - (clientY - rect.top));
+}
+$('btnZoomIn').addEventListener('click', () => setPps(state.pps * 1.25));
+$('btnZoomOut').addEventListener('click', () => setPps(state.pps / 1.25));
+scrollOuter.addEventListener('wheel', e => {
+  if (!state.loaded) return;
+  const rect = scrollOuter.getBoundingClientRect();
+  const overLyricsZone = (e.clientX - rect.left) >= RULER_W + WAVE_W;
+  if (!e.ctrlKey && !e.metaKey && overLyricsZone) return;
+  e.preventDefault();
+  zoomAt(e.deltaY < 0 ? 1.13 : 1 / 1.13, e.clientY);
+}, { passive: false });
+
+/* ================= 拖放 ================= */
+let dragDepth = 0;
+window.addEventListener('dragenter', e => {
+  e.preventDefault(); dragDepth++;
+  $('dropOverlay').classList.add('show');
+  $('dropHint').classList.add('drag');
+});
+window.addEventListener('dragleave', e => {
+  e.preventDefault();
+  if (--dragDepth <= 0) { dragDepth = 0; $('dropOverlay').classList.remove('show'); $('dropHint').classList.remove('drag'); }
+});
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', async e => {
+  e.preventDefault(); dragDepth = 0;
+  $('dropOverlay').classList.remove('show'); $('dropHint').classList.remove('drag');
+  const files = [...(e.dataTransfer.files || [])];
+  if (!files.length) return;
+  await handleDroppedFiles(files);
+});
+
+/* 一次拖入多个文件时：先分类，再"音频优先、歌词随后"按依赖顺序加载。
+   这样 mp3 + lrc 配套文件一次拖入即可（无需关心拖入顺序，也不用拖两次） */
+async function handleDroppedFiles(files) {
+  const audios = [], lyrics = [], others = [];
+  for (const f of files) {
+    const name = f.name.toLowerCase();
+    if (/\.(lrc|txt)$/.test(name) || f.type === 'text/plain') lyrics.push(f);
+    else if (f.type.startsWith('audio/') || /\.(mp3|wav|ogg|oga|flac|m4a|aac|opus|webm)$/.test(name)) audios.push(f);
+    else others.push(f);
+  }
+  const tips = [];
+  if (audios.length > 1) { tips.push('多个音频已取第一个：' + audios[0].name); audios.length = 1; }
+  if (lyrics.length > 1) { tips.push('多个歌词文件已取第一个：' + lyrics[0].name); lyrics.length = 1; }
+  if (others.length) tips.push('已忽略不支持的文件：' + others.map(f => f.name).join('、'));
+  if (tips.length) toast(tips.join('｜'));
+  // 顺序：先加载音频（歌词对齐与均匀分布都依赖音频时长），音频就绪后再导入歌词
+  if (audios[0]) await loadAudioFile(audios[0]);
+  if (lyrics[0]) {
+    if (state.loaded) importLrcText(await lyrics[0].text(), lyrics[0].name);
+    else toast('歌词文件未加载：请先提供可解码的音频文件');
+  }
+}
+
+/* ================= 工具栏 ================= */
+$('btnOpenAudio').addEventListener('click', () => $('audioFileInput').click());
+$('btnOpenAudio2').addEventListener('click', () => $('audioFileInput').click());
+$('audioFileInput').addEventListener('change', async e => {
+  if (e.target.files[0]) await loadAudioFile(e.target.files[0]);
+  e.target.value = '';
+});
+$('btnOpenLrc').addEventListener('click', () => $('lrcFileInput').click());
+$('lrcFileInput').addEventListener('change', async e => {
+  if (e.target.files[0]) importLrcText(await e.target.files[0].text(), e.target.files[0].name);
+  e.target.value = '';
+});
+$('btnAddLrc').addEventListener('click', () => {
+  if (!state.loaded) { toast('先加载一个音频文件吧'); return; }
+  if (lyricMode) setView('wave');        // 时间对齐类操作回到波形模式进行
+  createBlock(audio.currentTime || 0, [''], true);
+});
+$('btnClearLrc').addEventListener('click', () => {
+  if (!state.blocks.length) return;
+  if (lyricMode && lyricDirty && !confirm('文本框有未应用的修改，清空歌词会连同一起丢弃，继续？')) return;
+  clearBlocks();
+  if (lyricMode) { lyricEditor.value = ''; lyricDirty = false; updateLyricBar(); }
+});
+
+$('btnExport').addEventListener('click', () => {
+  if (lyricMode && lyricDirty
+      && confirm('歌词文本有未应用的修改。\n\n「确定」：先应用文本框内容再导出\n「取消」：按当前已应用的歌词导出')) applyLyricEditor();
+  if (!lyricRows().length) { toast('还没有有效歌词可以导出'); return; }
+  const out = buildLrcText();
+  $('exportText').value = out;
+  $('exportModal').classList.add('show');
+});
+$('btnCloseExport').addEventListener('click', () => $('exportModal').classList.remove('show'));
+$('exportModal').addEventListener('click', e => { if (e.target === $('exportModal')) $('exportModal').classList.remove('show'); });
+$('btnCopyLrc').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('exportText').value); toast('已复制到剪贴板'); }
+  catch { $('exportText').select(); document.execCommand('copy'); toast('已复制到剪贴板'); }
+});
+$('btnDownloadLrc').addEventListener('click', () => {
+  const base = (state.fileName || 'lyrics').replace(/\.[^.]+$/, '');
+  const blob = new Blob([$('exportText').value], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = base + '.lrc';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+/* ================= 外链新窗口 ================= */
+// target=_blank 在顶层页面由浏览器原生新开标签；但在内嵌 iframe（如工具预览面板）
+// 中部分环境会吞掉 _blank 变成同窗导航 —— 检测到自身在 iframe 里时改走 window.open，
+// 确保作者/官网链接永远不覆盖当前页面。
+window.addEventListener('click', e => {
+  const a = e.target.closest ? e.target.closest('a[target="_blank"]') : null;
+  if (!a) return;
+  if (window.self !== window.top) {
+    e.preventDefault();
+    window.open(a.href, '_blank', 'noopener');
+  }
+});
+
+/* ================= 键盘 ================= */
+// Tab = 全局在 0.5x（半速精听）与 1x（正常速）之间切换播放速度：任意焦点状态
+// （含输入框/文本框/下拉框）都拦截。当前为其它手动档位（0.25/0.75/1.5/2x 等）时按 Tab 先回到 1x。
+function cycleRate() {
+  const cur = audio.playbackRate || 1;
+  const next = (cur === 1) ? 0.5 : 1;            // 仅在 0.5 / 1 两档间往返
+  audio.playbackRate = next;
+  $('rateSel').value = String(next);
+  toast('播放速度 ' + next + 'x');
+}
+// 空格 = 全局播放/暂停：焦点落在按钮/波形/歌词卡片等处，按下即切换播放
+// 例外：文本可输入处（歌词行输入框、TEXTAREA 大编辑框/导出框、可编辑元素）空格是正常字符输入，不拦截 —— 否则英文歌词无法书写
+// （e.isComposing 时放行，保证中文输入法组词/选词上屏正常；e.repeat 避免长按连续切换）
+window.addEventListener('keydown', e => {
+  // Ctrl/Cmd + C / V：复制选中歌词 → 粘贴到播放头时间
+  // 输入框/文本框内放行给系统文本复制粘贴；歌词编辑(整篇文本)视图下不劫持
+  const combo = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !e.isComposing && !e.repeat;
+  if (combo) {
+    const k = e.key.toLowerCase();
+    if (k === 'c' || k === 'v') {
+      const tag = e.target.tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !lyricMode) {
+        e.preventDefault();
+        if (k === 'c') copySel(); else pasteAtPlayhead();
+        return;
+      }
+    }
+  }
+  if (e.key === 'Tab' && !e.isComposing && !e.repeat) {
+    e.preventDefault();
+    cycleRate();
+    return;
+  }
+  if (e.code === 'Space' && !e.isComposing) {
+    const et = e.target, tg = et.tagName;
+    const textable = tg === 'TEXTAREA' || et.isContentEditable ||
+      (tg === 'INPUT' && !['checkbox', 'radio', 'range', 'file', 'button', 'submit', 'reset'].includes((et.type || '').toLowerCase()));
+    if (!textable) {
+      e.preventDefault();
+      if (!e.repeat) togglePlay();
+      return;
+    }
+  }
+  // Delete / Backspace：非文本输入状态下删除所有选中的歌词块（文本输入时仍是正常删除文字）
+  // Delete = 全局删除：只要选中了歌词块就整组删除，不做输入框豁免
+  // Backspace 仍在文本输入状态下放行（删字用），避免打字时误删整块
+  const typing = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+  if (e.key === 'Delete' && selSet.size) {
+    e.preventDefault();
+    [...selSet].forEach(b => removeBlock(b));
+    selSet.clear();
+  } else if (e.key === 'Backspace' && !typing && selSet.size) {
+    e.preventDefault();
+    [...selSet].forEach(b => removeBlock(b));
+    selSet.clear();
+  }
+  // Escape：清空多选（回到无选择状态）
+  if (e.key === 'Escape' && !typing && selSet.size) {
+    e.preventDefault();
+    selClear();
+  }
+});
+
+/* ================= 示例歌曲（离线合成 + WAV 编码） ================= */
+async function makeDemoSong() {
+  const sr = 44100, dur = 36;
+  const oc = new OfflineAudioContext(1, sr * dur, sr);
+  const master = oc.createGain(); master.connect(oc.destination);
+  const nb = oc.createBuffer(1, Math.floor(sr * 0.1), sr);
+  const nd = nb.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nd.length, 2.5);
+  const scale = [262, 294, 330, 392, 440, 523, 587, 659];
+  function section(t) {
+    if (t < 4)  return { mel: 0.05, drum: 0 };
+    if (t < 12) return { mel: 0.12, drum: 0.15 };
+    if (t < 20) return { mel: 0.30, drum: 0.40 };
+    if (t < 24) return { mel: 0.06, drum: 0.05 };
+    return         { mel: 0.32, drum: 0.42 };
+  }
+  const beat = 0.4;
+  for (let t = 0; t < dur - 0.5; t += beat) {
+    const sec = section(t);
+    const o = oc.createOscillator(), g = oc.createGain();
+    o.type = 'triangle';
+    o.frequency.value = scale[Math.floor(Math.random() * scale.length)];
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(sec.mel, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.001, t + beat * 0.92);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + beat);
+    if (sec.drum > 0) {
+      const s = oc.createBufferSource(); s.buffer = nb;
+      const dg = oc.createGain(); dg.gain.value = sec.drum;
+      s.connect(dg); dg.connect(master); s.start(t);
+    }
+  }
+  return oc.startRendering();
+}
+
+function bufferToWavBlob(buf) {
+  const nCh = buf.numberOfChannels, len = buf.length, sr = buf.sampleRate;
+  const bytes = 44 + len * nCh * 2;
+  const ab = new ArrayBuffer(bytes), v = new DataView(ab);
+  const ws = (off, s) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  ws(0, 'RIFF'); v.setUint32(4, bytes - 8, true); ws(8, 'WAVE');
+  ws(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, nCh, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * nCh * 2, true); v.setUint16(32, nCh * 2, true); v.setUint16(34, 16, true);
+  ws(36, 'data'); v.setUint32(40, len * nCh * 2, true);
+  const chs = []; for (let c = 0; c < nCh; c++) chs.push(buf.getChannelData(c));
+  let off = 44;
+  for (let i = 0; i < len; i++) for (let c = 0; c < nCh; c++) {
+    let s = Math.max(-1, Math.min(1, chs[c][i]));
+    v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true); off += 2;
+  }
+  return new Blob([ab], { type: 'audio/wav' });
+}
+
+async function loadDemo() {
+  toast('正在合成示例歌曲…');
+  try {
+    const buf = await makeDemoSong();
+    applyAudio(buf, URL.createObjectURL(bufferToWavBlob(buf)), '示例歌曲.wav');
+    setTimeout(() => {
+      importLrcText([
+          '[00:03.00]Demo Song / 示例歌曲',
+          '[00:06.50]Soft intro begins',
+          '[00:06.50]轻柔的前奏缓缓响起',
+          '[00:10.00]Like the first light of dawn',
+          '[00:10.00]像清晨第一缕光',
+          '[00:13.50]The melody rises up',
+          '[00:13.50]旋律渐渐扬起',
+          '[00:17.00]Hearts beat along the rhythm',
+          '[00:17.00]心跳跟着节拍摇晃',
+          '[00:21.00]The chorus explodes here',
+          '[00:21.00]副歌在这里爆发',
+          '[00:24.50]Let every voice shine bright',
+          '[00:24.50]让所有的声音都发光',
+          '[00:28.00]We sing together loud',
+          '[00:28.00]我们一起大声唱',
+          '[00:31.50]Hold your dream above the sky',
+          '[00:31.50]把梦想举过头顶上',
+        ].join('\n'), '示例歌词（中英双语）');
+    }, 100);
+  } catch (e) { console.error(e); toast('示例生成失败：' + e.message); }
+}
+$('btnDemo').addEventListener('click', loadDemo);
+$('btnDemo2').addEventListener('click', loadDemo);
+</script>
+</body>
+</html>
