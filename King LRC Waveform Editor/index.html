@@ -440,7 +440,7 @@
 </main>
 
 <footer>
-  <span class="ver">v1.0.0</span>
+  <span class="ver">v1.1.1</span>
   <span class="slogan">但行好事，莫问前程。前路有光，初心莫忘。（作者：<a href="http://nm.tkcb.cc/" target="_blank" rel="noopener">TKCB-Nm</a>，官网：<a href="http://king.tkcb.cc/" target="_blank" rel="noopener">king.tkcb.cc</a>，Github：<a href="https://github.com/TKCB/King-LRC-Waveform-Editor/" target="_blank" rel="noopener">TKCB</a>）</span>
 </footer>
 
@@ -1150,7 +1150,8 @@ lyricEditor.addEventListener('keydown', e => {
 function lyricRows() {
   const rows = [];
   state.blocks.slice().sort((a, b) => a.time - b.time).forEach(b => {
-    b.texts.forEach(t => { if (t.text.trim()) rows.push('[' + fmt(b.time) + ']' + t.text); });
+    // 即使文本为空也保留时间轴：空行是用户在波形上为某时刻预留的位置占位，导出不应丢弃
+    b.texts.forEach(t => { rows.push('[' + fmt(b.time) + ']' + t.text); });
   });
   return rows;
 }
@@ -1321,7 +1322,7 @@ $('btnClearLrc').addEventListener('click', () => {
 $('btnExport').addEventListener('click', () => {
   if (lyricMode && lyricDirty
       && confirm('歌词文本有未应用的修改。\n\n「确定」：先应用文本框内容再导出\n「取消」：按当前已应用的歌词导出')) applyLyricEditor();
-  if (!lyricRows().length) { toast('还没有有效歌词可以导出'); return; }
+  if (!state.blocks.length) { toast('还没有有效歌词可以导出'); return; }
   const out = buildLrcText();
   $('exportText').value = out;
   $('exportModal').classList.add('show');
