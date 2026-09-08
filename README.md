@@ -1,5 +1,5 @@
 # King LRC Waveform Editor - LRC波形编辑器
-歌曲LRC文件波形编辑器，在波形上"看见"每一句歌词的时间轴 —— 为 LRC 歌词精确对轨而生的小工具。
+歌曲LRC文件波形编辑器，在波形上"看见"每一句歌词的时间轴 —— 可能是你见到的最好用的歌词制作工具。
 
 在线网页：[King_LRC_Waveform_Editor](http://king.tkcb.cc/King_LRC_Waveform_Editor/)
 
