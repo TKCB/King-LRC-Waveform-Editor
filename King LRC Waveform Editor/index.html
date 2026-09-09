@@ -1664,17 +1664,20 @@ window.addEventListener('keydown', e => {
     e.preventDefault();
     selClear();
   }
-  // 打轴编辑：回车给当前词条打轴（单击=打轴；0.5s 内快速多击=多语言时间同步）
-  // 导出弹窗打开时不拦截，避免误打轴
-  // 注意：只豁免"真正能输入文字"的元素（文本输入框 / TEXTAREA / 可编辑区）。
-  // range 滑块（进度条）、按钮等不算——否则拖完进度条焦点留在滑块上，回车会被误判成"打字中"而失效
-  if (e.key === 'Enter' && stampMode && !e.repeat && !$('exportModal').classList.contains('show')) {
+  // 回车：任何视图下，只要焦点不在"真正能输入文字"的控件上，一律拦截回车默认行为——
+  // 防止焦点还留在上次点击的按钮（加载示例 / 打开音频 / 导入LRC / 导出LRC…）上时，
+  // 习惯性按回车又把那个按钮重新激活一遍（浏览器原生：焦点在 button 上回车=触发点击）。
+  // 放行仅限文本输入框 / TEXTAREA / 可编辑区（回车=换行或提交文字）；
+  // range 滑块（进度条）、button、select、a 链接等都不放行。
+  if (e.key === 'Enter' && !e.repeat && !e.isComposing) {
     const et = e.target, tg = et.tagName;
     const textInput = tg === 'TEXTAREA' || et.isContentEditable ||
       (tg === 'INPUT' && !['checkbox', 'radio', 'range', 'file', 'button', 'submit', 'reset'].includes((et.type || '').toLowerCase()));
     if (!textInput) {
-      e.preventDefault();          // 阻止焦点落在按钮上时回车触发点击
-      stampEnter();
+      e.preventDefault();          // 阻止激活焦点所在按钮/控件
+      // 打轴编辑：回车给当前词条打轴（单击=打轴；0.5s 内快速多击=多语言时间同步）
+      // 导出弹窗打开时不打轴，避免误打
+      if (stampMode && !$('exportModal').classList.contains('show')) stampEnter();
     }
   }
 });
