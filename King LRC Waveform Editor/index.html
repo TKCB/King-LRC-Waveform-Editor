@@ -7,6 +7,10 @@
 <link rel="icon" type="image/png" href="images/logo.png">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* 去掉浏览器默认的黑色 focus 外圈（点击/拖拽后焦点留下的黑边线）；
+     应用自身的激活/选中高亮（按钮绿底、.active、.selected、打轴游标绿框等）都是
+     用 border/背景/box-shadow 实现的，不依赖 outline，故不受影响 */
+  :focus { outline: none; }
   html, body { height: 100%; }
   body {
     font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
@@ -499,8 +503,8 @@
   </div>
   <div id="stampPanel">
     <div class="sp-bar">
-      <span class="sp-pos" id="stampPos">游标：第 1 / 0 句</span>
-      <span class="sp-hint">播放歌曲听到某句起点时按 <b>回车</b> 给当前词条打轴并自动切到下一句；<b>0.5s 内快速多击回车</b> = 多语言各行时间同步（与第一句一致）。点击词条可把游标切到它。</span>
+      <span class="sp-pos" id="stampPos">打轴：第 1 / 0 句</span>
+      <span class="sp-hint">播放歌曲听到某句起点时按 <b>回车</b> 给当前词条打轴并自动切到下一句；<b>0.5s 内快速多击回车</b> = 多语言各行时间同步（与第一句一致）。</span>
     </div>
     <div id="stampList"></div>
   </div>
@@ -508,7 +512,7 @@
 </main>
 
 <footer>
-  <span class="ver">v1.3.3</span>
+  <span class="ver">v1.4.4</span>
   <span class="slogan">但行好事，莫问前程。前路有光，初心莫忘。（作者：<a href="http://nm.tkcb.cc/" target="_blank" rel="noopener">TKCB-Nm</a>，官网：<a href="http://king.tkcb.cc/" target="_blank" rel="noopener">king.tkcb.cc</a>，Github：<a href="https://github.com/TKCB/King-LRC-Waveform-Editor/" target="_blank" rel="noopener">TKCB</a>）</span>
 </footer>
 
@@ -611,7 +615,7 @@ function applyAudio(audioBuf, srcUrl, name) {
   $('dropHint').style.display = 'none';
   scrollOuter.style.display = 'block';
   renderAll();
-  $('chanLabel').style.display = (state.chan === 'stereo') ? 'flex' : 'none';
+  syncChanLabel();
   toast('已加载：' + name);
 }
 
@@ -732,11 +736,16 @@ function drawWave(h) {
   }
 }
 
+/* L/R 通道标签：只在「波形编辑视图 + 双声道」下显示；打轴/歌词视图一律隐藏 */
+function syncChanLabel() {
+  $('chanLabel').style.display = (!stampMode && !lyricMode && state.chan === 'stereo' && state.loaded) ? 'flex' : 'none';
+}
+
 function setChan(c) {
   state.chan = c;
   $('btnChanMono').classList.toggle('on', c === 'mono');
   $('btnChanStereo').classList.toggle('on', c === 'stereo');
-  $('chanLabel').style.display = (c === 'stereo' && state.loaded) ? 'flex' : 'none';
+  syncChanLabel();
   if (state.loaded) drawWave(timeH());
 }
 $('btnChanMono').addEventListener('click', () => setChan('mono'));
@@ -1171,17 +1180,17 @@ function setView(mode) {
   if (toStamp) {
     if (selSet.size) selClear();           // 打轴视图不使用卡片多选
     scrollOuter.style.display = 'none';
-    $('chanLabel').style.display = 'none';
+    syncChanLabel();
     stampPanel.classList.add('open');
     rebuildStampRows();                    // 进入打轴：由当前歌词拍平出词条列表
   } else if (lyricMode) {
     scrollOuter.style.display = 'none';
-    $('chanLabel').style.display = 'none';
+    syncChanLabel();
     fillLyricEditor();       // 当前歌词数据 → 填充到文本编辑框
     lyricPanel.classList.add('open');
   } else {
     scrollOuter.style.display = 'block';
-    $('chanLabel').style.display = (state.chan === 'stereo') ? 'flex' : 'none';
+    syncChanLabel();
     refreshAllCards();       // 数据是唯一来源 → 重建波形卡片
     renderAll();
   }
@@ -1240,8 +1249,8 @@ function setStampCursor(i, manual = false) {
 }
 function updateStampBar() {
   $('stampPos').textContent = stampRows.length
-    ? '游标：第 ' + (stampCursor + 1) + ' / ' + stampRows.length + ' 句'
-    : '游标：无词条';
+    ? '打轴：第 ' + (stampCursor + 1) + ' / ' + stampRows.length + ' 句'
+    : '打轴：无词条';
 }
 function scrollStampIntoView() {
   const cur = stampList.children[stampCursor];
@@ -1657,9 +1666,16 @@ window.addEventListener('keydown', e => {
   }
   // 打轴编辑：回车给当前词条打轴（单击=打轴；0.5s 内快速多击=多语言时间同步）
   // 导出弹窗打开时不拦截，避免误打轴
-  if (e.key === 'Enter' && stampMode && !typing && !e.repeat && !$('exportModal').classList.contains('show')) {
-    e.preventDefault();            // 阻止焦点落在按钮上时回车触发点击
-    stampEnter();
+  // 注意：只豁免"真正能输入文字"的元素（文本输入框 / TEXTAREA / 可编辑区）。
+  // range 滑块（进度条）、按钮等不算——否则拖完进度条焦点留在滑块上，回车会被误判成"打字中"而失效
+  if (e.key === 'Enter' && stampMode && !e.repeat && !$('exportModal').classList.contains('show')) {
+    const et = e.target, tg = et.tagName;
+    const textInput = tg === 'TEXTAREA' || et.isContentEditable ||
+      (tg === 'INPUT' && !['checkbox', 'radio', 'range', 'file', 'button', 'submit', 'reset'].includes((et.type || '').toLowerCase()));
+    if (!textInput) {
+      e.preventDefault();          // 阻止焦点落在按钮上时回车触发点击
+      stampEnter();
+    }
   }
 });
 
